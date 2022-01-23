@@ -1,0 +1,150 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>OTP Generator</title>
+
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+    <div class="frame">
+        <div class="title">OTP Generator</div>
+        <div class="tabs">
+            <div class="header">
+                <div class="tab totp selected" onclick="onTabClick('totp')">TOTP</div>
+                <div class="tab hotp" onclick="onTabClick('hotp')">HOTP</div>
+            </div>
+            <div class="content-container">
+                <div class="content totp visible">
+                    <div class="secret">
+                        <div class="label">Secret</div>
+                        <input class="input" type="text" oninput="onSecretInput('totp')" />
+                    </div>
+                    <div class="timer">
+                        <div class="label">--</div>
+                        <svg>
+                            <circle r="26" cx="30" cy="30"></circle>
+                        </svg>
+                    </div>
+                    <div class="code">------</div>
+                </div>
+                <div class="content hotp">
+                    <div class="secret">
+                        <div class="label">Secret</div>
+                        <input class="input" type="text" oninput="onSecretInput('hotp')" />
+                    </div>
+                    <div class="counter">
+                        <div class="label">Counter</div>
+                        <input class="input" type="number" min="1" oninput="onCounterInput('hotp')" />
+                    </div>
+                    <div class="code">------</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+
+<script src="libs/2fa-auth.js"></script>
+<script>
+    const auth2fa = window.auth2fa;
+
+    const elementTabTotp = document.querySelector(".tabs > .header > .tab.totp");
+    const elementTabContentTotp = document.querySelector(".tabs > .content-container > .content.totp");
+    const elementTotpTimerLabel = document.querySelector(".tabs > .content-container > .content.totp > .timer > .label");
+    const elementTotpTimerCircle = document.querySelector(".tabs > .content-container > .content.totp > .timer > svg > circle");
+    const elementTotpCode = document.querySelector(".tabs > .content-container > .content.totp > .code");
+    const elementTabHotp = document.querySelector(".tabs > .header > .tab.hotp");
+    const elementTabContentHotp = document.querySelector(".tabs > .content-container > .content.hotp");
+    const elementHotpCode = document.querySelector(".tabs > .content-container > .content.hotp > .code");
+
+    const inputTotpSecret = document.querySelector(".tabs > .content-container > .content.totp > .secret > .input");
+    const inputHotpSecret = document.querySelector(".tabs > .content-container > .content.hotp > .secret > .input");
+    const inputHotpCounter = document.querySelector(".tabs > .content-container > .content.hotp > .counter > .input");
+
+    const stepWindow = 30 * 1000;
+
+    let tabSelected = 'totp';
+    let totpSecret = '';
+    let hotpSecret = '';
+
+    // ------------------------------------------------------------------------
+
+    const refreshUI = () => {
+        switch (tabSelected) {
+            case "totp":
+                elementTabTotp.classList.add("selected");
+                elementTabContentTotp.classList.add("visible");
+                elementTabHotp.classList.remove("selected");
+                elementTabContentHotp.classList.remove("visible");
+                break;
+            case "hotp":
+                elementTabTotp.classList.remove("selected");
+                elementTabContentTotp.classList.remove("visible");
+                elementTabHotp.classList.add("selected");
+                elementTabContentHotp.classList.add("visible");
+                break;
+            default:
+                throw new Error("Invalid tab selected");
+        }
+    }
+
+    const updateTotpCode = timestamp => {
+        const totpCode = totpSecret ? auth2fa.OTP.getTotpCode(totpSecret, timestamp) : "------";
+        elementTotpCode.textContent = totpCode;
+    }
+
+    const updateHotpCode = () => {
+        const counter = parseInt(inputHotpCounter.value);
+        const hotpCode = hotpSecret && !isNaN(counter) ? auth2fa.OTP.getHotpCode(hotpSecret, counter) : "------";
+        elementHotpCode.textContent = hotpCode;
+    }
+
+    const onTabClick = tab => {
+        tabSelected = tab;
+        refreshUI();
+    }
+
+    const onSecretInput = tab => {
+        switch (tab) {
+            case "totp":
+                totpSecret = inputTotpSecret.value;
+                break;
+            case "hotp":
+                hotpSecret = inputHotpSecret.value;
+                updateHotpCode();
+                break;
+            default:
+                throw new Error("Invalid secret change");
+        }
+    }
+
+    const onCounterInput = tab => {
+        switch (tab) {
+            case "hotp":
+                updateHotpCode();
+                break;
+            default:
+                throw new Error("Invalid secret change");
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // main
+
+    setInterval(() => {
+        const time = Date.now();
+        const lastTimeStep = Math.floor(time / stepWindow);
+        const timeSinceStep = Date.now() - lastTimeStep * stepWindow;
+        const timeLeft = Math.ceil((stepWindow - timeSinceStep) / 1000);
+
+        elementTotpTimerLabel.textContent = timeLeft;
+        elementTotpTimerCircle.style["stroke-dashoffset"] = `${(1 - (timeLeft / 30)) * 165}px`;
+
+        updateTotpCode(time);
+    }, 250);
+
+</script>
+
+</html>
